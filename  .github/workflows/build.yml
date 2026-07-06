@@ -1,0 +1,53 @@
+# .github/workflows/build.yml
+name: Windows Auto Package Pipeline
+
+on:
+  push:
+    branches:
+      - main # Triggered when pushing to main branch
+
+jobs:
+  build-and-package:
+    runs-on: windows-latest
+
+    steps:
+    # 1. Checkout the repository code
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # 2. Set up Python environment (using stable 3.11 to guarantee PyQt6 wheel compatibility)
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    # 3. Install core platform dependencies
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller
+
+    # 4. Compile Python code into binary package using PyInstaller
+    # Crucial: We must explicitly collect dynamic plugin directories using --add-data
+    - name: Compile Executable
+      run: |
+        pyinstaller --noconsole `
+          --name "TrafficPlatform" `
+          --add-data "core;core" `
+          --add-data "ui;ui" `
+          --add-data "modules;modules" `
+          main.py
+
+    # 5. Compile the Inno Setup Script into an installer wizard
+    # GitHub's windows-latest runner comes with ISCC (Inno Setup Compiler) pre-installed
+    - name: Compile Installer Wizard
+      run: |
+        iscc setup.iss
+
+    # 6. Upload the final setup.exe as a workflow artifact
+    - name: Upload Installer Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: TrafficPlatform_Windows_Installer
+        path: installer_output/TrafficPlatform_Setup_x64.exe
